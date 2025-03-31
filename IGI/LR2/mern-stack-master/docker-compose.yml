@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:latest
+    ports:
+      - '27018:27017'
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - mern-network
+
+  api-server:
+    build:
+      context: ./
+      dockerfile: ./server/Dockerfile
+    volumes:
+      - server_node_modules:/mern-stack/server/node_modules
+      - ./server:/mern-stack/server
+    environment:
+      - MONGO_URI=mongodb://mongo/merndb
+    ports:
+      - '${SERVER_PORT}:${SERVER_PORT}'
+    depends_on:
+      - mongo
+    networks:
+      - mern-network
+
+  client:
+    build:
+      context: ./
+      dockerfile: ./client/Dockerfile
+    volumes:
+      - client_node_modules:/mern-stack/client/node_modules
+      - ./client:/mern-stack/client
+    stdin_open: true
+    ports:
+      - '${PORT}:${PORT}'
+    depends_on:
+      - api-server
+    networks:
+      - mern-network
+
+  nginx-proxy:
+    restart: always
+    build:
+      context: ./
+      dockerfile: ./nginx-proxy/Dockerfile
+    ports:
+      - '${NGINX_PROXY_PORT}:${NGINX_PROXY_PORT}'
+    environment:
+      - NGINX_LE_PLACEHOLDER_1=${PORT}
+      - NGINX_LE_PLACEHOLDER_2=${SERVER_PORT}
+      - NGINX_LE_PLACEHOLDER_3=${NGINX_PROXY_PORT}
+      - NGINX_LE_TZ
+    depends_on:
+      - api-server
+      - client
+    networks:
+      - mern-network
+
+volumes:
+  mongo_data:
+  server_node_modules:
+  client_node_modules:
+
+networks:
+  mern-network:
+    driver: bridge
